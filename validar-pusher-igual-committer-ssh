@@ -12,10 +12,10 @@ import contextlib
 import codecs
 from itertools import islice, izip
 
-GITLAB_SERVER = 'http://172.16.19.32'
-GITLAB_TOKEN = 'A2_fGvW6gJGz8bxsjsAH'
+GITLAB_SERVER = 'http://172.10.10.10'
+GITLAB_TOKEN = 'TOKEN_GENERADO_EN_FRONT'
 GITLAB_GROUP = 2
-EMAIL_DOMAIN = 'contactar-pasto.org'
+EMAIL_DOMAIN = 'DOMINIO'
 
 #print (os.environ['GL_ID'])
 #(os.environ['GL_ID']) => user-3 
