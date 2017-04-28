@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import sys
+import os
+import subprocess
+import urllib2
+import json
+import contextlib
+import codecs
+from itertools import islice, izip
+
+GITLAB_SERVER = 'http://172.16.19.32'
+GITLAB_TOKEN = 'A2_fGvW6gJGz8bxsjsAH'
+GITLAB_GROUP = 2
+EMAIL_DOMAIN = 'contactar-pasto.org'
+
+#print (os.environ['GL_ID'])
+#(os.environ['GL_ID']) => user-3 
+nada, ID_USUARIO = (os.environ['GL_ID']).split('-')
+
+
+def main():
+    commits = get_commits_from_push()
+    authors = get_gitlab_group_members()
+    current_user_name,current_user_email = get_gitlab_user().split(':')
+
+    for commit, author, email in commits:        
+        if(author != current_user_name):
+            die('El nombre del autor debe ser igual al usuario que realiza el push. [Username:{} - Email:{}].'.format(current_user_name, current_user_email), author, commit, authors)
+        if(email != current_user_email):
+            die('El correo del autor debe ser igual al usuario que realiza el push. [Username:{} - Email:{}].'.format(current_user_name, current_user_email), email, commit, authors)
+        if author not in authors:
+            die('Autor desconocido', author, commit, authors)
+        #if email != authors[author]:
+        #    die('Email desconocido', email, commit, authors)
+
+
+
+def get_commits_from_push():
+    old, new, branch = sys.stdin.read().split()
+    rev_format = '--pretty=format:%an%n%ae'
+    command = ['git', 'rev-list', rev_format, '{0}..{1}'.format(old, new)]
+    # branch delete, let it through
+    if new == '0000000000000000000000000000000000000000':
+        sys.exit(0)
+    # new branch
+    if old == '0000000000000000000000000000000000000000':
+        command = ['git', 'rev-list', rev_format, new, '--not', '--branches=*']
+    output = subprocess.check_output(command)
+    commits = [line.strip() for line in unicode(output, 'utf-8').split('\n') if line.strip()]
+    return izip(islice(commits, 0, None, 3),
+            islice(commits, 1, None, 3),
+            islice(commits, 2, None, 3))
+
+
+
+def get_gitlab_group_members():
+    url = '{0}/api/v3/groups/{1}/members'.format(GITLAB_SERVER, GITLAB_GROUP)
+    headers = {'PRIVATE-TOKEN': GITLAB_TOKEN}
+    request = urllib2.Request(url, None, headers)
+    with contextlib.closing(urllib2.urlopen(request)) as response:
+        members = json.load(response)
+    return dict((member['name'], '{}@{}'.format(member['username'], EMAIL_DOMAIN))
+        for member in members)
+
+def get_gitlab_user():
+    url = '{0}/api/v3/users/{1}/'.format(GITLAB_SERVER, ID_USUARIO)
+    headers = {'PRIVATE-TOKEN': GITLAB_TOKEN}
+    request = urllib2.Request(url, None, headers)
+    with contextlib.closing(urllib2.urlopen(request)) as response:
+        datos = json.load(response)
+    return '{}:{}'.format(datos['username'],datos['email'])
+
+
+def die(reason, invalid_value, commit, authors):
+    message = []
+    message.append('*' * 80)
+    # message.append('JR-GL_ID: {1}'.format(os.environ['GL_ID']))
+    message.append("ERROR: {0} '{1}' in {2}"
+            .format(reason, invalid_value, commit))
+    message.append('-' * 80)
+    #message.append('Allowed authors and emails:')
+    print('\n'.join(message), file=sys.stderr)
+    #for name, email in authors.items():
+    #    print(u"  '{0} <{1}>'".format(name, email), file=sys.stderr)
+    sys.exit(1)
+
+
+
+def set_locale(stream):
+    return codecs.getwriter('utf-8')(stream)
+
+if __name__ == '__main__':
+    # avoid Unicode errors in output
+    sys.stdout = set_locale(sys.stdout)
+    sys.stderr = set_locale(sys.stderr)
+    # you may want to skip HTTPS certificate validation:
+    #  import ssl
+    #  if hasattr(ssl, '_create_unverified_context'):
+    #    ssl._create_default_https_context = ssl._create_unverified_context
+
+    main()
